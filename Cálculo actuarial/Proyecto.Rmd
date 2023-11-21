@@ -1,0 +1,425 @@
+---
+title: "ProyectoContingenciasII"
+author: "Ana, Ester y Luis"
+date: "2023-10-30"
+output: html_document
+---
+
+```{r}
+library(readxl)
+```
+
+## Carga de Datos y determinación de tasa de descuento e inflación
+```{r}
+dataEdadesH <- read_excel("BaseDatosProyecto.xlsx", sheet = "PobHombres")
+dataEdadesM <- read_excel("BaseDatosProyecto.xlsx", sheet = "PobMujeres")
+dataProbH <- read_excel("BaseDatosProyecto.xlsx", sheet = "PTHombres")
+dataProbM <- read_excel("BaseDatosProyecto.xlsx", sheet = "PTMujeres")
+dataFuerzaTrans <- read_excel("BaseDatosProyecto.xlsx", sheet = "MatrizFT")
+Tdesc <- 0.05
+Tinfl <- 0.03
+```
+
+## Funciones necesarias para las actuariales
+```{r}
+
+# Determina el valor de fila en el cual se encuentra la edad buscada
+clasificarEdad <- function(edad) {
+  if (edad >= 20 && edad <= 29) {
+    return(0)
+  } else if (edad >= 30 && edad <= 39) {
+    return(1)
+  } else if (edad >= 40 && edad <= 49) {
+    return(2)
+  } else if (edad >= 50 && edad <= 59) {
+    return(3)
+  } else if (edad >= 60 && edad <= 69) {
+    return(4)
+  } else if (edad >= 70 && edad <= 79) {
+    return(5)
+  } else if (edad >= 80 && edad <= 89) {
+    return(6)
+  } else {
+    return(-1)
+  }
+}
+
+# Obtiene la probabilidad de transición
+probabilidadTransicion <- function(sexo, edad, estadoInicial, estadoFinal) {
+  
+  if(sexo == 0){
+    matrizProbabilidades <- dataProbH
+  } else if(sexo == 1){
+    matrizProbabilidades <- dataProbM
+  }
+  
+  # Calcula los índices, suma 2 por el cómo está la base de datos
+  fila <- 2 + (estadoInicial-1) * 7 + clasificarEdad(edad)
+  columna <- 2 + estadoFinal-1
+  
+  # Extrae las probabilidades de transición
+  proba <- as.numeric(as.vector(matrizProbabilidades[fila, columna]))
+  
+  return(proba)
+}
+
+# Obtiene la fuerza de transición, HOMBRE = 0, MUJER = 1
+fuerzaTransicion <- function(sexo, estadoInicial, estadoFinal){
+  
+  # Calcula los índices, suma 1 por el cómo está la base de datos
+  fila <- (sexo * 8) + estadoInicial
+  columna <- 1 + estadoFinal 
+  
+  # Extrae las probabilidades de transición
+  proba <- as.numeric(as.vector(dataFuerzaTrans[fila, columna]))
+  
+  return(proba)
+}
+
+matrices <- function(sexo, x, estadoInicial) {
+  k <- 90 -x
+  memo1 <- matrix(NA, nrow = k+1, ncol = 6)  # Matriz para almacenar resultados calculados
+  memo2 <- matrix(NA, nrow = k+1, ncol = 6)
+  memo3 <- matrix(NA, nrow = k+1, ncol = 6)
+  memo4 <- matrix(NA, nrow = k+1, ncol = 6)
+  memo5 <- matrix(NA, nrow = k+1, ncol = 6)
+  memo6 <- matrix(NA, nrow = k+1, ncol = 6)
+  memo <- matrix(NA, nrow = k+1, ncol = 6)
+  
+  for (j in 1:k) {
+    if (j == 1) {
+      for (i in 1:6) {
+        memo[1, i] <- probabilidadTransicion(sexo, x, estadoInicial, i) # Todas probs pasar de INICIAL a i
+      }
+    }
+    if (j >= 2) {
+      for (i in 1:6) {
+        memo1[j, i] <- memo[j - 1, i] * probabilidadTransicion(sexo, x + j - 1, i, 1) # 
+        memo2[j, i] <- memo[j - 1, i] * probabilidadTransicion(sexo, x + j - 1, i, 2) # 
+        memo3[j, i] <- memo[j - 1, i] * probabilidadTransicion(sexo, x + j - 1, i, 3)
+        memo4[j, i] <- memo[j - 1, i] * probabilidadTransicion(sexo, x + j - 1, i, 4)
+        memo5[j, i] <- memo[j - 1, i] * probabilidadTransicion(sexo, x + j - 1, i, 5)
+        memo6[j, i] <- memo[j - 1, i] * probabilidadTransicion(sexo, x + j - 1, i, 6)
+      }
+      memo[j,1] <- sum(memo1[j,])
+      memo[j,2] <- sum(memo2[j,])
+      memo[j,3] <- sum(memo3[j,])
+      memo[j,4] <- sum(memo4[j,])
+      memo[j,5] <- sum(memo5[j,])
+      memo[j,6] <- sum(memo6[j,])
+    }
+  }
+  
+  # Normalizar las filas 
+  memo <-t(apply(memo,1,function(x) x/sum(x)))
+  memo[is.na(memo)] <- 0
+  
+  for(i in 1:5){
+    memo[k,i] <- 0
+  }
+  memo[k,6] <- 1
+ 
+  return(memo) # Devuelve la matriz de transición iniciando en el estado establecido y yendo a cualquier estado
+}
+
+# Creas la gran lista para hombre y mujer
+
+granListaHombre <- vector("list", length = 70)
+for (i in 20:90) {
+  sublista <- list()
+  for (j in 1:6) {
+    submatriz <- matrices(0, i, j)  # Supongamos que matrices() devuelve la submatriz adecuada
+    sublista[[j]] <- submatriz
+  }
+  granListaHombre[[i - 19]] <- sublista
+} # matrices(0, edad, estadoInicial) = granListaHombre[[edad - 19]][[estadoInicial]]
+
+granListaMujer <- vector("list", length = 70)
+for (i in 20:90) {
+  sublista <- list()
+  for (j in 1:6) {
+    submatriz <- matrices(1, i, j)  # Supongamos que matrices() devuelve la submatriz adecuada
+    sublista[[j]] <- submatriz
+  }
+  granListaMujer[[i - 19]] <- sublista
+} # matrices(1, edad, estadoInicial) = granListaMujer[[edad - 19]][[estadoInicial]]
+
+# Devuelve el valor exacto de kpx
+kpx <- function(sexo, k, x, estadoInicial, estadoFinal){
+  if(sexo == 0){
+    matriz <- granListaHombre
+  } else if(sexo == 1){
+    matriz <- granListaMujer
+  }
+  
+  if(k==0){
+    if(estadoInicial==estadoFinal){
+      resultado <- 1
+      return(resultado)
+    } else if(estadoInicial!=estadoFinal){
+      resultado <- 0
+      return(resultado)
+    }
+  } else if(k>0){
+  resultadoMatricial <- matriz[[x - 19]][[estadoInicial]]
+  resultado <- resultadoMatricial[k, estadoFinal]
+  return(resultado)
+  }
+}
+
+```
+
+
+## Funciones de anualidades temp, vitalicia y ambas en Woolhouse
+```{r}
+
+# Anualidad temporal que se requiere para Woolhouse
+anualidadTemp <- function(sexo, edad, desc, infl, estadoInicial, estadoFinal) { # ax:65-x
+  #vp cuando k =0
+  vp <- 0
+  n <- 65 - edad
+  tasaEquiv <- (desc-infl)/(1+infl)
+  # Sumatoria de la anualidad temporal
+  for (k in 0:(n-1)) {
+    vp <- vp + (1+tasaEquiv)^(-k) * kpx(sexo, k, edad, estadoInicial, estadoFinal)
+  }
+  return(vp)
+}
+
+# Anualidad vitalicia, asumiendo que todos mueren a los 90
+anualidadVitalicia <- function(sexo, edad, desc, infl, estadoInicial, estadoFinal){ #a65
+  #vp cuando k =0
+  vp <- 0
+  tasaEquiv <- (desc-infl)/(1+infl)
+  # Sumatoria de la anualidad temporal
+  for (k in 0:25) {
+    vp <- vp + (1+tasaEquiv)^(-k) * kpx(sexo, k, edad, estadoInicial, estadoFinal)
+  }
+  return(vp)
+}
+
+# Anualidad mensual temporal con Woolhouse
+anualidadTempMensual <- function(sexo, edad, desc, infl, estadoInicial, estadoFinal) { # ax:65-x
+  
+  vp <- anualidadTemp(sexo, edad, desc, infl, estadoInicial, estadoFinal) + ((144-1)/(12*144))*fuerzaTransicion(sexo, estadoInicial, estadoFinal)
+
+  return(vp)
+}
+
+# Anualidad vitalicia temporal con Woolhouse
+anualidadVitalMensual <- function(sexo, edad, desc, infl, estadoInicial, estadoFinal) {
+  
+  vp <- anualidadVitalicia(sexo, edad, desc, infl, estadoInicial, estadoFinal) + ((144-1)/(12*144))*fuerzaTransicion(sexo, estadoInicial, estadoFinal)
+
+  return(vp)
+}
+
+```
+
+
+
+## Función de seguro
+```{r}
+
+seguroVitalicio <- function(sexo, edad, desc, infl, estadoInicial){ #A65
+  vp <- 0
+  kx <- 25
+  tasaEquiv <- (desc-infl)/(1+infl)
+  for (k in 1:kx) {
+    vp <- vp + (1+tasaEquiv)^(-k) * kpx(sexo, k, edad, estadoInicial, 6)
+  }
+  
+  return(vp)
+}
+
+seguroCreTemp <- function(sexo, edad, desc, infl, estadoInicial){ # Ax:65-x
+  vp <- 0
+  n <- 65 - edad # Temporal
+  tasaEquiv <- (desc-infl)/(1+infl)
+  # Sumatoria temporal
+  for (k in 1:n) {
+    vp <- vp + (1+tasaEquiv)^(-k) * kpx(sexo, k, edad, estadoInicial, 6)*k
+  }
+  
+  return(vp)
+}
+
+```
+
+
+## Cálculo primas
+```{r}
+calcularPrima <- function(benef2, benef3, benef4, benef5, benef6, sexo, edad, desc, infl, estadoInicial){
+  suma2 <- 0
+  suma3 <- 0
+  suma4 <- 0
+  suma5 <- 0
+  suma6 <- 0
+  
+  # Caso del beneficio 2
+  for (i in 1:5) {
+    suma2 <- suma2 + anualidadVitalMensual(sexo, 65, desc, infl, i, 2) * kpx(sexo, 65-edad, edad, i, 2)
+  }
+  # Caso del beneficio 3
+  for (i in 1:5) {
+    suma3 <- suma3 + anualidadVitalMensual(sexo, 65, desc, infl, i, 3) * kpx(sexo, 65-edad, edad, i, 3)
+  }
+  # Caso del beneficio 4
+  for (i in 1:5) {
+    suma4 <- suma4 + anualidadVitalMensual(sexo, 65, desc, infl, i, 4) * kpx(sexo, 65-edad, edad, i, 4)
+  }
+  # Caso del beneficio 5
+  for (i in 1:5) {
+    suma5 <- suma5 + anualidadVitalMensual(sexo, 65, desc, infl, i, 5) * kpx(sexo, 65-edad, edad, i, 5)
+  }
+  # Caso del beneficio 6
+  for (i in 1:5) {
+    suma6 <- suma6 + seguroVitalicio(sexo, 65, desc, infl, i) * kpx(sexo, 65-edad, edad, i, 6)
+  }
+  
+  # Beneficios totales
+  benefTotal <- benef2 * (1+desc)^(65-edad) * suma2 + benef3 * (1+desc)^(65-edad) * suma3 + benef4 * (1+desc)^(65-edad) * suma4 + benef5 * (1+desc)^(65-edad) * suma5 + benef6 * (1+desc)^(65-edad) * suma6 
+  
+  # Prima 
+  #prima <- benefTotal/(0.95 * anualidadTempMensual(sexo, edad, desc, infl, 1, 1) - seguroCreTemp(sexo, edad, desc, infl, 1))
+  prima <- benefTotal/(0.95 * anualidadTempMensual(sexo, edad, desc, infl, 1, 1))
+  
+  return(prima)
+}
+
+
+caso1 <- calcularPrima(1000, 2000, 5000, 10000, 300, 1, 20, Tdesc, Tinfl, 1)
+caso2 <- calcularPrima(1000, 2000, 5000, 10000, 300, 1, 21, Tdesc, Tinfl, 1)
+caso3 <- calcularPrima(1000, 2000, 5000, 10000, 300, 1, 22, Tdesc, Tinfl, 1)
+caso4 <- calcularPrima(1000, 2000, 5000, 10000, 300, 1, 23, Tdesc, Tinfl, 1)
+caso5 <- calcularPrima(1000, 2000, 5000, 10000, 300, 1, 24, Tdesc, Tinfl, 1)
+caso6 <- calcularPrima(1000, 2000, 5000, 10000, 300, 1, 49, Tdesc, Tinfl, 1)
+caso7 <- calcularPrima(1000, 2000, 5000, 10000, 300, 1, 64, Tdesc, Tinfl, 1)
+# caso5 <- calcularPrima(1000, 2000, 5000, 10000, 3000, 0, 34, Tdesc, Tinfl, 1)
+```
+
+
+```{r}
+lista <- list()
+
+for (i in 20:65) {
+  valor <- calcularPrima(1000, 2000, 5000, 10000, 300, 0, i, Tdesc, Tinfl, 1)
+  lista[[i - 19]] <- valor
+}
+
+# Crear un vector con números enteros para el eje x
+numeros_enteros <- 1:45
+
+# Crear el gráfico con los valores calculados
+plot(numeros_enteros, unlist(lista), type = "l", xlab = "Número", ylab = "Valor", main = "Gráfico de Líneas")
+
+
+```
+
+```{r}
+# Crear las listas para los valores de seguro y anualidad
+listaSeguro <- list()
+listaAnualidad <- list()
+
+# Llenar las listas con valores
+for (i in 20:85) {
+  valorSeguro <- seguroCreTemp(0, i, Tdesc, Tinfl, 1)
+  listaSeguro[[i - 19]] <- valorSeguro
+  valorAnualidad <- anualidadTempMensual(0, i, Tdesc, Tinfl, 1, 1)
+  listaAnualidad[[i - 19]] <- valorAnualidad
+}
+
+# Crear un vector con números enteros para el eje x
+numeros_enteros <- 20:85
+
+# Extraer los valores de las listas
+valoresSeguro <- sapply(listaSeguro, function(x) as.numeric(x))
+valoresAnualidad <- sapply(listaAnualidad, function(x) as.numeric(x))
+
+# Crear el gráfico con los valores de seguro
+plot(numeros_enteros, valoresSeguro, type = "l", xlab = "Número", ylab = "Valor", main = "Gráfico de Seguro")
+
+# Agregar los valores de anualidad al mismo gráfico
+lines(numeros_enteros, valoresAnualidad, col = "red")
+
+# Agregar una leyenda
+legend("topright", legend = c("Seguro", "Anualidad"), col = c("black", "red"), lty = 1, cex = 0.8)
+
+
+```
+
+
+
+## SECCIÓN MODIFICADA
+
+```{r}
+
+matricesModif <- function(sexo, x, estadoInicial) {
+  k <- 90 - x
+  memo1 <- matrix(NA, nrow = k, ncol = 6)  # Matriz para almacenar resultados calculados
+  memo2 <- matrix(NA, nrow = k, ncol = 6)
+  memo3 <- matrix(NA, nrow = k, ncol = 6)
+  memo4 <- matrix(NA, nrow = k, ncol = 6)
+  memo5 <- matrix(NA, nrow = k, ncol = 6)
+  memo6 <- matrix(NA, nrow = k, ncol = 6)
+  memo <- matrix(NA, nrow = k, ncol = 6)
+  
+  for (j in 1:k) {
+    if (j == 1) {
+      for (i in 1:6) {
+        memo[1, i] <- probabilidadTransicion(sexo, x, estadoInicial, i) # Todas probs pasar de INICIAL a i
+      }
+    }
+    if (j >= 2) {
+      for (i in 1:6) {
+        memo1[j, i] <- memo[j - 1, i] * probabilidadTransicion(sexo, x + j - 1, i, 1) # 
+        memo2[j, i] <- memo[j - 1, i] * probabilidadTransicion(sexo, x + j - 1, i, 2) # 
+        memo3[j, i] <- memo[j - 1, i] * probabilidadTransicion(sexo, x + j - 1, i, 3)
+        memo4[j, i] <- memo[j - 1, i] * probabilidadTransicion(sexo, x + j - 1, i, 4)
+        memo5[j, i] <- memo[j - 1, i] * probabilidadTransicion(sexo, x + j - 1, i, 5)
+        memo6[j, i] <- memo[j - 1, i] * probabilidadTransicion(sexo, x + j - 1, i, 6)
+      }
+      memo[j,1] <- sum(memo1[j,])
+      memo[j,2] <- sum(memo2[j,])
+      memo[j,3] <- sum(memo3[j,])
+      memo[j,4] <- sum(memo4[j,])
+      memo[j,5] <- sum(memo5[j,])
+      memo[j,6] <- sum(memo6[j,])
+    }
+  }
+  
+  # Normalizar las filas 
+  memo <-t(apply(memo,1,function(x) x/sum(x)))
+  memo[is.na(memo)] <- 0
+  
+  for(i in 1:5){
+    memo[k,i] <- 0
+  }
+  memo[k,6] <- 1
+ 
+  return(memo) # Devuelve la matriz de transición iniciando en el estado establecido y yendo a cualquier estado
+}
+
+ejemploModif <- matricesModif(0, 20, 1)
+```
+
+```{r}
+kpx <- function(sexo, k, x, estadoInicial, estadoFinal){
+  matriz <- matricesModif(sexo, x, estadoInicial)
+  resultado <- matriz[k,estadoFinal]
+  return(resultado)
+}
+```
+
+```{r}
+
+caso1Modif <- calcularPrima(1000, 2000, 5000, 10000, 3000, 0, 20, Tdesc, Tinfl, 1)
+```
+
+```{r}
+# Modelo determinístico 
+
+
+```
+
+

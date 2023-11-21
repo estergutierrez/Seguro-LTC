@@ -4,7 +4,7 @@ Además contiene el código para el cálculo de las funciones actuariales, el mo
 Así como los resultados financieros. 
 El código se encuentra segmentado en tres partes:
 
-📂 Cálculo actuarial: Esta carpeta contiene los siguientes elementos
+# 📂 Cálculo actuarial: Esta carpeta contiene los siguientes elementos
 
   📊 BaseDatosProyecto.xlsx : este es el archivo que contiene los datos sobre probabilidades de transición, población y tasas.
   
@@ -12,13 +12,18 @@ El código se encuentra segmentado en tres partes:
   
   💾 Proyecto.Rmd : Es el código con las funciones actuariales necesarias
   
-📂 Modelo_deterministico: Esta carpeta contiene los siguientes elementos
+# 📂 Modelo_deterministico: Esta carpeta contiene los siguientes elementos
+
   📂 Figuras: Contiene todos los gráficos generados referentes a la proyección demográfica y financiera deterministica 
+  
   💾 ModeloDeterministico.R: Es el código que genera la proyección demográfica y financiera para ambos sexos.
   
-📂 Modelo estocástico: Esta carpeta contiene los siguientes elementos
+# 📂 Modelo estocástico: Esta carpeta contiene los siguientes elementos
+
   📂 Figuras: Contiene todos los gráficos generados referentes a la proyección demográfica y financiera estocástica
+  
   💾 Proyecciones_hombres.R: Es el código que genera la proyección demográfica y financiera estocástica para hombres.
+  
   💾 Proyecciones_mujeres.R: Es el código que genera la proyección demográfica y financiera estocástica para mujeres.
 
 ## 💻 Instrucciones para correr el código 

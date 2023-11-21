@@ -5,8 +5,11 @@ Así como los resultados financieros.
 El código se encuentra segmentado en tres partes:
 
 📂 Cálculo actuarial: Esta carpeta contiene los siguientes elementos
+
   📊 BaseDatosProyecto.xlsx : este es el archivo que contiene los datos sobre probabilidades de transición, población y tasas.
+  
   📂 Figuras: Contiene todos los gráficos generados referentes al cálculo de primas
+  
   💾 Proyecto.Rmd : Es el código con las funciones actuariales necesarias
   
 📂 Modelo_deterministico: Esta carpeta contiene los siguientes elementos

@@ -200,7 +200,7 @@ ciclo_mujeres<-rep(edades, times = cantidad_mujeres)# vector de poblacion femeni
 
 # Simulacion de los universos
 
-n<-2000 # Numero de iteraciones
+n<-2 # Numero de iteraciones
 iteracionesM <-vector("list", length = n)
 for(j in 1:length(iteracionesM)){
   tic("Cada ciclo")
@@ -401,10 +401,10 @@ percentilesM5<-percentil_financiero(suma_cols5)
 #### Estado 6
 # Se construye el vector para calcular los egresos relacionados al estado 6
 Suma_aegurada<-10000000 
-Gasto_finalizacion<-300000
+Gasto_financiero<-300000
 vector_SA<-c(rep(Suma_aegurada,times = 30),rep(0, times = 26),rep(0,times =60))
-vector_Gastofinalizacion<-c(rep(Gasto_finalizacion,times = 30),rep(Gasto_finalizacion, times = 26),rep(0,times =60)) 
-vector_estado6<-vector_SA+vector_Gastofinalizacion
+vector_Gasto<-c(rep(Gasto_financiero,times = 30),rep(Gasto_financiero, times = 26),rep(0,times =60)) 
+vector_estado6<-vector_SA+vector_Gasto
 
 
 
@@ -435,24 +435,19 @@ for(i in 1:length(matrices_ceros)){
 }
 
 
+
 # Se aplica el mismo algoritmo anterior para obtener la matriz con los egresos
 # asociados al estado 6
-beneficiosM6 <-vector("list", length = length(matrices_ceros))
 for(k in 1:length(matrices_ceros)){
   temp<-unlist(lapply(poblacion, function(i) 
   { matrices_ceros[[k]][i,]*vector_estado6[(ciclo_mujeres[i]-34):((ciclo_mujeres[i]-34)+99)]}))
-  beneficiosM6[[k]]<-matrix(data=temp, ncol = 100, nrow = length(ciclo_mujeres), byrow = TRUE)
+  matrices_ceros[[k]]<-matrix(data=temp, ncol = 100, nrow = length(ciclo_mujeres), byrow = TRUE)
 }
 
-# Este devuelve los egresos relacinados al estado 6 por año para todas las simulaciones 
-suma_cols6<-lapply(beneficiosM6, FUN=function(x) colSums(x)*inflacion)
+suma_cols6<-lapply(matrices_ceros, FUN=function(x) colSums(x)*inflacion)
 # Esperanza
 esperanza_financiera6<- (Reduce("+", suma_cols6))/n
 esperanza_financiera6<-matrix(data=esperanza_financiera6, nrow=100,ncol=1, byrow = TRUE)
 
 # Percentil
 percentilesM6<-percentil_financiero(suma_cols6)
-
-
-
-

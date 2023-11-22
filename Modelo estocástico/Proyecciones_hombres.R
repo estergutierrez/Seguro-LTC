@@ -133,7 +133,9 @@ for (i in 20:90) {
 
 
 granListaHombre[[90 - 19]][[6]] <- matrix(c(0, 0, 0, 0, 0, 1), nrow = 1, ncol = 6)
-#Lista de probabilidades acomuladas para simular vida
+## Funciones necesarias para la simulacion
+# Se crear una lista de las probabilidades acumuladas para definir en que estado se encuentran
+# según la edad
 probs_H <- vector("list")
 for (i in 20:90) {
   temp <- list()
@@ -144,6 +146,13 @@ for (i in 20:90) {
   probs_H[[i-19]] <- temp
 } 
 
+########### Simulacion estocastica hombres
+# La simulacion estocastica se fundamenta en 3 pases:
+#   1. Simular una vida
+#   2. Simular una probabilidad
+#   3. Simular las iteraciones 
+
+## Demografico
 
 simularvidaH<-function(x){
   estado= rep(6,100)
@@ -168,6 +177,7 @@ simularvidaH<-function(x){
   return(estado)
 }
 
+# Se crean los vectores para generar la poblacion
 edades <-seq(35,50) 
 edad2023H <-subset(dataEdadesH, select = c(1,6)) # seleccionar lo importante
 edad2023H <- edad2023H[edad2023H$`Edades` %in% edades, ] # Filtrar filas por edad
@@ -176,11 +186,10 @@ edad2023H$`2023` <- round(edad2023H$`2023`, digits = 0) # redondear los valores
 
 cantidad_hombres<- list(edad2023H$`2023`) # crear lista de la columna
 cantidad_hombres <-as.numeric(cantidad_hombres[[1]]) # transformarla en double
-ciclo_hombres<-rep(edades, times = cantidad_hombres)#
+ciclo_hombres<-rep(edades, times = cantidad_hombres)# vector con la poblacion masculina
 
-
-n<-5 # Cambiar si es necesario
-tic("Total") 
+# Simulacion de los universos
+n<-2 # Numero de iteraciones
 iteracionesH <-vector("list", length = n)
 for(j in 1:length(iteracionesH)){
   tic("Cada ciclo")
@@ -189,8 +198,8 @@ for(j in 1:length(iteracionesH)){
   toc()
   iteracionesH[[j]]<-t(temp)
 }
-toc()
 
+# Funcion que retorna la cantidad de estados por año de cada matriz en la lista 
 cantidad_Estados<-function(lista){
   total_estados <-vector("list", length = length(lista))
   k=1
@@ -204,42 +213,38 @@ cantidad_Estados<-function(lista){
   return(total_estados)
 }
 
+# Lista de matrices cuyas columnas son los años y los estados, cada entrada representa
+# la cantidad de personas en el estado j, en año t
 total_estadosH<-cantidad_Estados(iteracionesH)
 
+## Para calcular la esperanza, suma totas las matrices de la lista de matrices anterior
+# y lo divide entre el número de iteraciones
 esperanzaH <- (Reduce("+", total_estadosH))/length(iteracionesH)
 
 
 # ### Percentil 99.5
+# Esta función convierte la lista de matrices que tiene el recuento de personas
+# por estado y año en un distintas listas
 vectoresH<-lapply(lapply(total_estadosH, t), function(x) as.vector(x))
+# Eliminar las listas, colocarlos los elementos anteriores en un solo vector 
 temp<-unlist(vectoresH)
 
+
+# Reacomoda los vectores anteriores en un listas de vectores de tal forma que la lista
+# la lista 1 guarda todas las entradas (1,1) de todas las matrices en la lista total_estadosM
+# en la lista 2 se guardan todas las en (1,2) de todas las matrices en la lista total_estadosM
+# Y así sucesivamente
 entradasH <-vector("list", length = (length(temp)/n))
 for(i in 1:(length(temp)/n)){
   entradasH [[i]]<-temp[cumsum(lengths(vectoresH))-(lengths(vectoresH)-c(i))]
 }
 
+#Le aplica la función percentil a cada una de las listas anteriorespercentilesM <-sapply(entradasM, FUN=function(x) quantile(x,probs=c(0.995)))
+
 percentilesH <-sapply(entradasH, FUN=function(x) quantile(x,probs=c(0.995)))
+# Se acomodan los percenctiles en una matriz cuyas columnas representan los estados
+# y las filas los años
 percentilesH<-matrix(data=percentilesH, nrow=100,ncol=6, byrow = TRUE)
-
-
-
-
-
-##### Creacion de dataframes
-
-df_esperanzaHombres<-as.data.frame(esperanzaH)
-
-df_percentilHombres<-as.data.frame(percentilesH)
-colnames(df_percentilHombres) <- c("1", "2","3","4","5","6") 
-
-#Exportar como excel
-write_xlsx(df_esperanzaHombres,"C:/Users/Ana/Desktop/II-2023/Contingencias de vida II/MediaHombres_demografica.xlsx")
-write_xlsx(df_percentilHombres,"C:/Users/Ana/Desktop/II-2023/Contingencias de vida II/PercentilHombres_demografica.xlsx")
-
-write.csv(df_esperanzaHombres, "C:/Users/Ana/Desktop/II-2023/Contingencias de vida II/MediaHombres_demografica.csv", row.names=FALSE)
-write.csv(df_percentilHombres, "C:/Users/Ana/Desktop/II-2023/Contingencias de vida II/PercentilHombres_demografica.csv", row.names=FALSE)
-
-
 
 
 
@@ -250,10 +255,10 @@ poblacion<-c(1:length(ciclo_hombres))
 # Inflacion
 power <- function(x, y) x^y
 inflacion<-power(c(rep((Tinfl+1), times = 100)), c(0:99))
-## Tasa de interes
-# interes<-power(c(rep((Tdesc+1), times = 115)), c(1:115))
 
 ## Funciones a utilizar 
+## función que devuelve una lista de matrices con los montos montos a pagar según el año
+# de cada una de las simulaciones
 indicadoras_estadosH<-function(estado, iteraciones, vector_beneficio, ciclo){
   indicadora<-lapply(iteraciones, FUN= function(x) matrix(data=as.numeric(x==estado), ncol = 100))
   beneficios <-vector("list", length = length(indicadora))
@@ -265,7 +270,8 @@ indicadoras_estadosH<-function(estado, iteraciones, vector_beneficio, ciclo){
   
 }
 
-# Percentil
+# Esta función devuelve el percentil de financieron utilizando un algoritmo similar 
+# al anterior
 percentil_financiero<-function(suma_cols){
   vectores<-lapply(lapply(suma_cols, t), function(x) as.vector(x))
   temp<-unlist(vectores)
@@ -279,75 +285,41 @@ percentil_financiero<-function(suma_cols){
 }
 
 
+### Ingresos
 Prima<-6434838 
 Prima_neta<-Prima*0.95
-#vector de primas netas
+# vector con las primas netas
 vector_primas<-c(rep(Prima_neta,times = 30),rep(0, times = 26),rep(0,times =60))
 
 
-# Ingresos
-#tic("Ingresos")
+# Retorna una lista de matrices la cual determina los ingresos netos a pagar según 
+# para cada una de las simulaciones hechas anteriormente
+
 primas_netasH <-indicadoras_estadosH(1, iteracionesH, vector_primas, ciclo_hombres)
+
+# Se suman todas las columnas de cada matriz en la lista anterior e indexa los montos 
+# a la inflacion
 suma_colsprimaH<-lapply(primas_netasH, FUN=function(x) colSums(x)*inflacion)
 
+# Se suman todos los valores anteriores y se divide entre el número de simulaciones
 esperanza_financieraprimasH <- (Reduce("+", suma_colsprimaH))/n
 esperanza_financieraprimasH<-matrix(data=esperanza_financieraprimasH, nrow=100,ncol=1, byrow = TRUE)
 
+# Percentil
+# Se calcula los percentiles los ingresos por años para cada simulacion
 percentilesHprima<-percentil_financiero(suma_colsprimaH)
 
 
-# Creacion de df
-df_ingresosHombresMedia<-as.data.frame(esperanza_financieraprimasH)
-df_ingresosHombresPercentil<-as.data.frame(percentilesHprima)
-
-write_xlsx(df_ingresosHombresMedia,"C:/Users/Ana/Desktop/II-2023/Contingencias de vida II/MediaHombres_ingresos.xlsx")
-write_xlsx(df_ingresosHombresPercentil,"C:/Users/Ana/Desktop/II-2023/Contingencias de vida II/PercentilHombres_ingresos.xlsx")
-
-write.csv(df_ingresosHombresMedia, "C:/Users/Ana/Desktop/II-2023/Contingencias de vida II/MediaHombres_ingresos.csv", row.names=FALSE)
-write.csv(df_ingresosHombresPercentil, "C:/Users/Ana/Desktop/II-2023/Contingencias de vida II/PercentilHombres_ingresos.csv", row.names=FALSE)
-
 
 ## Egresos 
-## Estado 1
-Gasto_primas<-0.05*Prima
-
-## Gastos de primas
-
-vector_gasto<-c(rep(Gasto_primas,times = 30),rep(0, times = 26),rep(0,times =60))
-
-primas_gastoH<-indicadoras_estadosH(1, iteracionesH, vector_gasto, ciclo_hombres)
-
-# Egresos por a;o
-suma_colsgastoH<-lapply(primas_gastoH, FUN=function(x) colSums(x)*inflacion)
-# Esperanza
-esperanza_financieragastoH <- (Reduce("+", suma_colsgastoH))/n
-esperanza_financieragastoH<-matrix(data=esperanza_financieragastoH, nrow=100,ncol=1, byrow = TRUE)
-
-
-# Percentil
-percentilesHgasto <-percentil_financiero(suma_colsgastoH)
-
-
-# Creacion de df
-esperanza_egresosH<-as.data.frame(esperanza_financieragastoH)
-Percentil_egresosH<-as.data.frame(percentilesHgasto)
-
-write_xlsx(esperanza_egresosH,"C:/Users/Ana/Desktop/II-2023/Contingencias de vida II/MediaHombres_ingresos.xlsx")
-write_xlsx(Percentil_egresosH,"C:/Users/Ana/Desktop/II-2023/Contingencias de vida II/PercentilHombres_ingresos.xlsx")
-
-write.csv(esperanza_egresosH, "C:/Users/Ana/Desktop/II-2023/Contingencias de vida II/MediaHombres_ingresos.csv", row.names=FALSE)
-write.csv(Percentil_egresosH, "C:/Users/Ana/Desktop/II-2023/Contingencias de vida II/PercentilHombres_ingresos.csv", row.names=FALSE)
-
-
-
 
 ### Estado 2
 beneficio1<- 3000000 #costo fijo
+
 vector_beneficio1<-c(rep(0,times = 30),rep(beneficio1, times = 26),rep(0,times =60))
 
-beneficiosH2<-indicadoras_estadosH(2, iteracionesH, vector_beneficio1, ciclo_hombres)
-# Egresos por a;o
-suma_colsH2<-lapply(beneficiosH2, FUN=function(x) colSums(x)*inflacion)
+# Calcula los egresos relacionados al estado 2 por año para cada una de las simulaciones realizadas
+suma_colsH2<-lapply(indicadoras_estadosH(2, iteracionesH, vector_beneficio1, ciclo_hombres), FUN=function(x) colSums(x)*inflacion)
 # Esperanza
 esperanza_financieraH2 <- (Reduce("+", suma_colsH2))/n
 esperanza_financieraH2<-matrix(data=esperanza_financieraH2, nrow=100,ncol=1, byrow = TRUE)
@@ -357,10 +329,10 @@ percentilesH2<-percentil_financiero(suma_colsH2)
 
 
 
-### Estado 3
-beneficiosH3<-indicadoras_estadosH(3, iteracionesH, vector_beneficio1, ciclo_hombres)
-# Egresos por a;o
-suma_colsH3<-lapply(beneficiosH3, FUN=function(x) colSums(x)*inflacion)
+### Egresos 3
+# Función que retorna los egresos totales relacionados al estado 3 para cada una de las simulaciones
+
+suma_colsH3<-lapply(indicadoras_estadosH(3, iteracionesH, vector_beneficio1, ciclo_hombres), FUN=function(x) colSums(x)*inflacion)
 # Esperanza
 esperanza_financieraH3 <- (Reduce("+", suma_colsH3))/n
 esperanza_financieraH3<-matrix(data=esperanza_financieraH3, nrow=100,ncol=1, byrow = TRUE)
@@ -369,14 +341,12 @@ percentilesH3<-percentil_financiero(suma_colsH3)
 
 
 #### Estados 4 y 5 
+# Se construye un nuevo vector de beneficios relacionados a estos nuevos dos estados
 beneficio2<-7000000
 vector_beneficio2<-c(rep(0,times=30),rep(beneficio2,times=26),rep(0,times=60))
 
-### Estado 4
-# Indicadora 
-beneficiosH4<-indicadoras_estadosH(4, iteracionesH, vector_beneficio2, ciclo_hombres)
-
-suma_colsH4<-lapply(beneficiosH4, FUN=function(x) colSums(x)*inflacion)
+# Retorna una lista de los egresos relacionados al estado 4 de cada una de las simulaciones
+suma_colsH4<-lapply(indicadoras_estadosH(4, iteracionesH, vector_beneficio2, ciclo_hombres), FUN=function(x) colSums(x)*inflacion)
 # Esperanza
 esperanza_financieraH4 <- (Reduce("+", suma_colsH4))/n
 esperanza_financieraH4<-matrix(data=esperanza_financieraH4, nrow=100,ncol=1, byrow = TRUE)
@@ -385,9 +355,8 @@ percentilesH4<-percentil_financiero(suma_colsH4)
 
 
 ### Estado 5
-# Indicadora 
-beneficiosH5<-indicadoras_estadosH(5, iteracionesH, vector_beneficio2, ciclo_hombres)
-suma_colsH5<-lapply(beneficiosH5, FUN=function(x) colSums(x)*inflacion)
+# Retorna los egresos relacionados al estado 5 por año en cada una de las simulaciones realizadas
+suma_colsH5<-lapply(indicadoras_estadosH(5, iteracionesH, vector_beneficio2, ciclo_hombres), FUN=function(x) colSums(x)*inflacion)
 # Esperanza
 esperanza_financieraH5 <- (Reduce("+", suma_colsH5))/n
 esperanza_financieraH5 <-matrix(data=esperanza_financieraH5 , nrow=100,ncol=1, byrow = TRUE)
@@ -396,42 +365,49 @@ percentilesH5<-percentil_financiero(suma_colsH5)
 
 
 #### Estado 6
+# Se construye el vector para calcular los egresos relacionados al estado 6
+
 Suma_aegurada<-10000000 
-Gasto_finalizacion<-300000
+Gasto_financiero<-300000
 vector_SA<-c(rep(Suma_aegurada,times = 30),rep(0, times = 26),rep(0,times =60))
-vector_Gastofinalizacion<-c(rep(Gasto_finalizacion,times = 30),rep(Gasto_finalizacion, times = 26),rep(0,times =60)) 
-vector_estado6<-vector_SA+vector_Gastofinalizacion
+vector_Gasto<-c(rep(Gasto_financiero,times = 30),rep(Gasto_financiero, times = 26),rep(0,times =60)) 
+vector_estado6<-vector_SA+vector_Gasto
 
-
+# Construcción de la indicadora esperial
+# Se crea una lista de matrices indicadoras que retorna 1 si en individuo se encuentra en el estado 6
+# en el año t y 0 en otro caso
 indicadora_temp<-lapply(iteracionesH, FUN= function(x) matrix(data=as.numeric(x==6), ncol = 100))
-# Funcion para obtener los indices del primer 6, es decir cuando murio
+
+# Funcion para obtener los indices del primer 1 de las matrices anteriores, es decir el año en que murio
 colIndexes<-vector("list", length = length(indicadora_temp))
 for(i in 1:length(indicadora_temp)){
   colIndexes[[i]]<-unlist(apply(indicadora_temp[[i]],1, FUN=function(x) min(which(x==1))))
   
 }
 
-# Se crean una matriz de 0 para reemplazar con los indices  
+# Se crean una matriz de 0 para reemplazar 1 más adelante 
 matrices_ceros <-vector("list", length = length(indicadora_temp))
 for(i in 1:length(indicadora_temp)){
   matrices_ceros[[i]]<-matrix(0, ncol = 100, nrow = length(ciclo_hombres))
 }
-# Indices de fila
+# Se crea la indicadora que solo devuelve un 1 por persona
 rowIndexes<-c(1:length(ciclo_hombres))
 for(i in 1:length(indicadora_temp)){
   matrices_ceros[[i]][cbind(rowIndexes, colIndexes[[i]])] <- 1
 }
 
 
+# Se aplica el mismo algoritmo anterior para obtener la matriz con los egresos
+# asociados al estado 6
 
-beneficiosH6 <-vector("list", length = length(matrices_ceros))
 for(k in 1:length(matrices_ceros)){
   temp<-unlist(lapply(poblacion, function(i) 
   {matrices_ceros[[k]][i,]*vector_estado6[(ciclo_hombres[i]-34):((ciclo_hombres[i]-34)+99)]}))
-  beneficiosH6[[k]]<-matrix(data=temp, ncol = 100, nrow = length(ciclo_hombres), byrow = TRUE)
+  matrices_ceros[[k]]<-matrix(data=temp, ncol = 100, nrow = length(ciclo_hombres), byrow = TRUE)
 }
 
-suma_colsH6<-lapply(beneficiosH6, FUN=function(x) colSums(x)*inflacion)
+# Lista con todos los egresos por año de cada iteración
+suma_colsH6<-lapply(matrices_ceros, FUN=function(x) colSums(x)*inflacion)
 # Esperanza
 esperanza_financieraH6<- (Reduce("+", suma_colsH6))/n
 esperanza_financieraH6<-matrix(data=esperanza_financieraH6, nrow=100,ncol=1, byrow = TRUE)

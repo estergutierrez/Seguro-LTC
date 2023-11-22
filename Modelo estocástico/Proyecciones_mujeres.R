@@ -443,7 +443,7 @@ for(k in 1:length(matrices_ceros)){
   { matrices_ceros[[k]][i,]*vector_estado6[(ciclo_mujeres[i]-34):((ciclo_mujeres[i]-34)+99)]}))
   matrices_ceros[[k]]<-matrix(data=temp, ncol = 100, nrow = length(ciclo_mujeres), byrow = TRUE)
 }
-
+# suma de todos los egresos del estado 6 por año
 suma_cols6<-lapply(matrices_ceros, FUN=function(x) colSums(x)*inflacion)
 # Esperanza
 esperanza_financiera6<- (Reduce("+", suma_cols6))/n
